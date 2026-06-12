@@ -1,0 +1,18 @@
+[project]
+name = "check-novogene"
+version = "0.1.0"
+description = "Novogene WES tracker — scraper + API + dashboard"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "bottle>=0.12",
+    "requests>=2.31",
+    "cryptography>=41.0",
+    "python-dotenv>=1.0",
+    "pandas>=2.0",
+    "matplotlib>=3.8",
+    "jupyter>=1.0",
+]
+
+[project.scripts]
+novogene = "main:cli"

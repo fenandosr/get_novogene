@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Novogene WES Tracker</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+  <style>
+    :root {
+      --c-pending:  #6b7280;
+      --c-received: #3b82f6;
+      --c-qc:       #8b5cf6;
+      --c-lib:      #ec4899;
+      --c-dataqc:   #f59e0b;
+      --c-release:  #06b6d4;
+      --c-report:   #10b981;
+    }
+    body { max-width: 1400px; margin: 0 auto; }
+
+    .site-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 1rem 0 0.5rem; border-bottom: 1px solid var(--pico-muted-border-color);
+      margin-bottom: 1.5rem; flex-wrap: wrap; gap: 0.5rem;
+    }
+    .site-header h1 { margin: 0; font-size: 1.2rem; }
+    .meta { color: var(--pico-muted-color); font-size: 0.82rem; }
+
+    .stats-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+      gap: 0.75rem; margin-bottom: 1.5rem;
+    }
+    .stat-card {
+      background: var(--pico-card-background-color);
+      border: 1px solid var(--pico-muted-border-color);
+      border-radius: var(--pico-border-radius);
+      padding: 0.85rem 1rem; text-align: center;
+    }
+    .stat-card .val { font-size: 1.9rem; font-weight: 700; line-height: 1; margin-bottom: 0.2rem; }
+    .stat-card .lbl { font-size: 0.7rem; color: var(--pico-muted-color); text-transform: uppercase; letter-spacing: 0.05em; }
+    .c-complete .val { color: var(--c-report); }
+    .c-inprog   .val { color: var(--c-lib); }
+    .c-norel    .val { color: var(--c-dataqc); }
+    .c-delayed  .val { color: #ef4444; }
+    .c-tat      .val { color: var(--c-release); font-size: 1.5rem; }
+
+    .panel-row {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;
+    }
+    @media (max-width: 900px) { .panel-row { grid-template-columns: 1fr; } }
+    .panel {
+      background: var(--pico-card-background-color);
+      border: 1px solid var(--pico-muted-border-color);
+      border-radius: var(--pico-border-radius); padding: 1rem 1.1rem;
+    }
+    .panel h3 { margin: 0 0 0.85rem; font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.07em; color: var(--pico-muted-color); }
+
+    .bk-row { display: grid; grid-template-columns: 10rem 1fr 4rem; align-items: center; gap: 0.5rem; margin-bottom: 0.55rem; }
+    .bk-label { font-size: 0.72rem; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .bk-track { background: color-mix(in srgb, var(--pico-muted-color) 12%, transparent); border-radius: 2px; height: 10px; }
+    .bk-fill  { height: 10px; border-radius: 2px; }
+    .bk-stat  { font-size: 0.7rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .bk-row.is-top .bk-label { color: var(--c-dataqc); }
+    .bk-row.is-top .bk-stat  { color: var(--c-dataqc); }
+
+    .dr-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+    .dr-table th { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--pico-muted-color); padding: 0.3rem 0.5rem; border-bottom: 1px solid var(--pico-muted-border-color); text-align: left; }
+    .dr-table td { padding: 0.35rem 0.5rem; border-bottom: 1px solid color-mix(in srgb, var(--pico-muted-border-color) 40%, transparent); vertical-align: middle; }
+    .dr-table tr:last-child td { border-bottom: none; }
+    .dw-late { color: #ef4444; font-weight: 700; }
+    .dw-warn { color: var(--c-dataqc); font-weight: 700; }
+    .dw-ok   { color: var(--pico-muted-color); }
+
+    .pipeline { display: flex; align-items: center; gap: 0; margin-bottom: 1.5rem; overflow-x: auto; padding-bottom: 0.25rem; }
+    .pipe-stage { display: flex; align-items: center; flex-shrink: 0; }
+    .pipe-label { font-size: 0.68rem; padding: 0.25rem 0.55rem; border-radius: 2rem; white-space: nowrap; font-weight: 600; }
+    .pipe-arrow { color: var(--pico-muted-color); padding: 0 0.1rem; font-size: 0.75rem; }
+
+    .project-header { display: flex; align-items: baseline; gap: 0.75rem; margin: 1.5rem 0 0.6rem; flex-wrap: wrap; }
+    .project-header h2 { margin: 0; font-size: 0.95rem; }
+    .project-name { color: var(--pico-muted-color); font-size: 0.82rem; }
+
+    .sample-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+    .sample-table th { text-align: left; padding: 0.35rem 0.5rem; font-size: 0.67rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--pico-muted-color); border-bottom: 1px solid var(--pico-muted-border-color); white-space: nowrap; }
+    .sample-table td { padding: 0.4rem 0.5rem; border-bottom: 1px solid color-mix(in srgb, var(--pico-muted-border-color) 45%, transparent); vertical-align: middle; }
+    .sample-table tr:last-child td { border-bottom: none; }
+    .sample-table tr:hover td { background: color-mix(in srgb, var(--pico-primary) 5%, transparent); }
+    tr.row-complete td:first-child { border-left: 3px solid var(--c-report); }
+    tr.row-delayed  td:first-child { border-left: 3px solid #ef4444; }
+    tr.row-norel    td:first-child { border-left: 3px solid var(--c-dataqc); }
+
+    .badge { display: inline-block; padding: 0.15rem 0.45rem; border-radius: 0.25rem; font-size: 0.67rem; font-weight: 600; white-space: nowrap; }
+    .proj-tag { font-size: 0.65rem; font-family: monospace; padding: 0.1rem 0.35rem; border-radius: 0.2rem; white-space: nowrap; }
+
+    .dot-track { display: flex; align-items: center; gap: 2px; }
+    .dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+    .dot-conn { flex: 1; height: 2px; min-width: 4px; max-width: 14px; border-radius: 1px; }
+
+    .tat-chip { font-size: 0.78rem; font-weight: 700; }
+    .tat-chip.ok   { color: var(--c-report); }
+    .tat-chip.warn { color: var(--c-dataqc); }
+    .tat-chip.late { color: #ef4444; }
+    .tat-chip.pend { color: var(--pico-muted-color); }
+
+    details summary { cursor: pointer; font-size: 0.75rem; color: var(--pico-muted-color); list-style: none; }
+    details summary::-webkit-details-marker { display: none; }
+    details summary::before { content: '▸ '; }
+    details[open] summary::before { content: '▾ '; }
+    .tl-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.2rem 1rem; font-size: 0.72rem; padding: 0.4rem 0; }
+    .tl-stage { color: var(--pico-muted-color); }
+
+    .runs-list { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+    .run-chip { font-size: 0.72rem; padding: 0.2rem 0.55rem; border-radius: 2rem; border: 1px solid var(--pico-muted-border-color); text-decoration: none; color: var(--pico-muted-color); }
+    .run-chip:hover, .run-chip.active { border-color: var(--pico-primary); color: var(--pico-primary); }
+    .run-chip.active { background: color-mix(in srgb, var(--pico-primary) 10%, transparent); }
+
+    #scrape-btn { font-size: 0.78rem; padding: 0.35rem 0.8rem; margin: 0; }
+    #scrape-status { font-size: 0.78rem; color: var(--pico-muted-color); }
+  </style>
+</head>
+<body>
+<main class="container-fluid">
+
+<header class="site-header">
+  <div>
+    <h1>Novogene WES Tracker</h1>
+    % if run:
+    <span class="meta">
+      Última corrida: <strong>{{run.get('timestamp_display','')}}</strong>
+      &nbsp;·&nbsp; {{run['project_count']}} proyecto(s)
+    </span>
+    % else:
+    <span class="meta">Sin datos — ejecuta el scraper primero</span>
+    % end
+  </div>
+  <div style="display:flex;align-items:center;gap:0.6rem;flex-wrap:wrap;">
+    % if summaries and len(summaries) > 1:
+    <div class="runs-list">
+      % for s in summaries[:5]:
+      <a href="/run/{{s['filename']}}"
+         class="run-chip {{'active' if current_file == s['filename'] else ''}}">
+        {{s['timestamp_display']}}
+      </a>
+      % end
+    </div>
+    % end
+    <button id="scrape-btn" onclick="triggerScrape()">▶ Scrape ahora</button>
+    <span id="scrape-status"></span>
+  </div>
+</header>
+
+% if not run:
+<article><p>No hay corridas. Configura <code>.env</code> y ejecuta <code>python main.py scrape</code>.</p></article>
+% else:
+
+<!-- SUMMARY CARDS -->
+<div class="stats-grid">
+  <div class="stat-card">
+    <div class="val">{{ctx['total']}}</div><div class="lbl">Muestras</div>
+  </div>
+  <div class="stat-card c-complete">
+    <div class="val">{{ctx['complete']}}</div><div class="lbl">Completadas</div>
+  </div>
+  <div class="stat-card c-inprog">
+    <div class="val">{{ctx['inprog']}}</div><div class="lbl">En proceso</div>
+  </div>
+  <div class="stat-card c-norel">
+    <div class="val">{{ctx['need_dr']}}</div><div class="lbl">Sin Data Release</div>
+  </div>
+  <div class="stat-card c-delayed">
+    <div class="val">{{ctx['delayed']}}</div><div class="lbl">Retrasadas</div>
+  </div>
+  % if ctx['avg_tat'] is not None:
+  <div class="stat-card c-tat">
+    <div class="val">{{ctx['avg_tat']}}d</div><div class="lbl">TAT promedio</div>
+  </div>
+  <div class="stat-card c-tat">
+    <div class="val">{{ctx['min_tat']}}–{{ctx['max_tat']}}d</div><div class="lbl">TAT min–max</div>
+  </div>
+  % end
+</div>
+
+<!-- BOTTLENECK + PENDING DATA RELEASE -->
+<div class="panel-row">
+
+  <div class="panel">
+    <h3>Cuello de botella — días promedio por etapa</h3>
+    % for b in ctx['bk_data']:
+    <div class="bk-row {{'is-top' if b['is_top'] else ''}}">
+      <span class="bk-label" title="{{b['key']}}">{{b['label']}}</span>
+      <div class="bk-track">
+        <div class="bk-fill" style="width:{{b['pct']}}%;background:{{b['color']}};"></div>
+      </div>
+      <span class="bk-stat" style="color:{{b['color']}};">
+        {{b['avg']}}d
+        <span style="font-weight:400;color:var(--pico-muted-color);font-size:0.63rem;">&thinsp;max {{b['max']}}d</span>
+      </span>
+    </div>
+    % end
+  </div>
+
+  <div class="panel">
+    <h3>Sin Data Release — requieren seguimiento ({{ctx['need_dr']}})</h3>
+    % if not ctx['pending_dr']:
+    <p class="meta" style="margin:0;">✓ Todas las muestras han alcanzado Data Release</p>
+    % else:
+    <div style="overflow-x:auto;">
+    <table class="dr-table">
+      <thead><tr>
+        <th>Muestra</th><th>Proyecto</th><th>Estado</th><th>Recibida</th><th>Días</th>
+      </tr></thead>
+      <tbody>
+        % for s in ctx['pending_dr']:
+        <tr>
+          <td><strong>{{s['sample_name']}}</strong></td>
+          <td>
+            <span class="proj-tag" style="color:{{s['proj_color']}};border:1px solid {{s['proj_color']}};">
+              {{s['proj_alias']}}
+            </span>
+          </td>
+          <td>
+            <span class="badge" style="background:color-mix(in srgb,{{s['badge_color']}} 18%,transparent);color:{{s['badge_color']}};border:1px solid color-mix(in srgb,{{s['badge_color']}} 35%,transparent);">
+              {{s['current_status_meaning']}}
+            </span>
+          </td>
+          <td class="meta">{{(s['timeline'].get('RECEIVED') or s.get('qc_arrived_date',''))[:10] or '—'}}</td>
+          <td>
+            % if s['days_waiting'] is not None:
+            <span class="{{s['days_waiting_cls']}}">{{s['days_waiting']}}d</span>
+            % else:
+            <span class="meta">—</span>
+            % end
+          </td>
+        </tr>
+        % end
+      </tbody>
+    </table>
+    </div>
+    % end
+  </div>
+
+</div>
+
+<!-- BOXPLOT TAT -->
+<div class="panel" style="margin-bottom:1.5rem;">
+  <h3>Distribución TAT — recibido → data release (días)</h3>
+  <canvas id="bpCanvas" style="width:100%;height:160px;display:block;"></canvas>
+</div>
+
+<!-- PIPELINE LEGEND -->
+<div class="pipeline">
+  % stage_labels = ["Pending Arrival","Received","Sample QC","Lib Prep / Seq","Data QC","Final Report","Data Release"]
+  % for i, (sk, sc, sl) in enumerate(zip(ctx['stage_keys'], ctx['stage_colors'], stage_labels)):
+  <div class="pipe-stage">
+    <span class="pipe-label"
+          style="background:color-mix(in srgb,{{sc}} 18%,transparent);color:{{sc}};border:1px solid color-mix(in srgb,{{sc}} 35%,transparent);">
+      {{sl}}
+    </span>
+    % if i < len(ctx['stage_keys']) - 1:
+    <span class="pipe-arrow">›</span>
+    % end
+  </div>
+  % end
+</div>
+
+<!-- PER-PROJECT TABLES -->
+% for project in run['projects']:
+<div class="project-header">
+  <span class="proj-tag" style="font-size:0.8rem;padding:0.2rem 0.6rem;color:{{ctx['proj_color'].get(project['sub_project_no'],'var(--pico-muted-color)')}};border:1px solid {{ctx['proj_color'].get(project['sub_project_no'],'var(--pico-muted-color)')}};border-radius:0.3rem;">
+    {{project['alias']}}
+  </span>
+  <h2 class="project-name">{{project['sub_project_no']}}</h2>
+  <span class="meta" style="margin-left:auto;">
+    {{project['complete_count']}} / {{project['sample_count']}} completadas
+  </span>
+</div>
+
+<div style="overflow-x:auto;margin-bottom:1.5rem;">
+<table class="sample-table">
+  <thead><tr>
+    <th>Muestra</th><th>Novo ID</th><th>Progreso</th>
+    <th>Estado actual</th><th>Recibida</th><th>Reporte</th><th>TAT</th>
+  </tr></thead>
+  <tbody>
+    % for s in project['sorted_samples']:
+    <tr class="{{s['row_class']}}">
+      <td><strong>{{s['sample_name']}}</strong></td>
+      <td class="meta">{{s['novo_id']}}</td>
+      <td>
+        <div class="dot-track">
+          % for di, dot in enumerate(s['dots']):
+          <div class="dot"
+               title="{{dot['key']}}: {{dot['date']}}"
+               style="background:{{dot['color']}};opacity:{{'1' if dot['has'] else '0.18'}};{{'outline:2px solid ' + dot['color'] + ';outline-offset:1px;' if dot['is_cur'] else ''}}">
+          </div>
+          % if di < len(s['dots']) - 1:
+          <div class="dot-conn" style="background:color-mix(in srgb,{{dot['color']}} {{'28' if dot['has'] else '10'}}%,transparent);"></div>
+          % end
+          % end
+        </div>
+      </td>
+      <td>
+        <span class="badge" style="background:color-mix(in srgb,{{s['badge_color']}} 18%,transparent);color:{{s['badge_color']}};border:1px solid color-mix(in srgb,{{s['badge_color']}} 35%,transparent);">
+          {{s['current_status_meaning']}}
+        </span>
+      </td>
+      <td class="meta">{{(s['timeline'].get('RECEIVED') or s.get('qc_arrived_date',''))[:10] or '—'}}</td>
+      <td class="meta">{{(s['timeline'].get('FINAL_REPORT') or '')[:10] or '—'}}</td>
+      <td><span class="tat-chip {{s['tat_cls']}}">{{s['tat_lbl']}}</span></td>
+    </tr>
+    <tr>
+      <td colspan="7" style="padding:0 0.5rem 0.5rem 1.5rem;">
+        <details>
+          <summary>timeline</summary>
+          <div class="tl-grid">
+            % for tl in s['tl_rows']:
+            <span class="tl-stage" style="color:{{tl['color']}};">{{tl['stage']}}</span>
+            <span>
+              {{tl['date']}}
+              % if tl['dur'] is not None:
+              <span class="meta">&thinsp;(+{{tl['dur']}}d)</span>
+              % end
+            </span>
+            % end
+          </div>
+        </details>
+      </td>
+    </tr>
+    % end
+  </tbody>
+</table>
+</div>
+% end
+
+% end
+</main>
+
+<script>
+// ── Boxplot data (injected by server) ──────────────────────────────
+const BP_GROUPS = {{!__import__('json').dumps(ctx.get('boxplot', []))}};
+
+// ── Boxplot renderer ───────────────────────────────────────────────
+(function drawBoxplot() {
+  const canvas = document.getElementById('bpCanvas');
+  if (!canvas || !BP_GROUPS.length) return;
+
+  const groups = BP_GROUPS.filter(g => g.stats);
+  if (!groups.length) return;
+
+  // Resolve CSS variables to actual colours
+  const style = getComputedStyle(document.documentElement);
+  function cssVar(v) {
+    const m = v.match(/var\((--[^)]+)\)/);
+    if (!m) return v;
+    return style.getPropertyValue(m[1]).trim() || '#888';
+  }
+
+  const DPR    = window.devicePixelRatio || 1;
+  const W      = canvas.offsetWidth  || 700;
+  const H      = 160;
+  canvas.width  = W * DPR;
+  canvas.height = H * DPR;
+  canvas.style.height = H + 'px';
+
+  const ctx2 = canvas.getContext('2d');
+  ctx2.scale(DPR, DPR);
+
+  // Layout constants
+  const PAD_L  = 140;   // label area
+  const PAD_R  = 24;
+  const PAD_T  = 18;
+  const PAD_B  = 32;
+  const plotW  = W - PAD_L - PAD_R;
+  const rowH   = (H - PAD_T - PAD_B) / groups.length;
+
+  // Global data range
+  const allPts = groups.flatMap(g => g.stats.points);
+  const dMin   = Math.min(...allPts);
+  const dMax   = Math.max(...allPts);
+  const pad    = Math.max(1, (dMax - dMin) * 0.08);
+  const xMin   = Math.max(0, dMin - pad);
+  const xMax   = dMax + pad;
+
+  function xScale(v) { return PAD_L + (v - xMin) / (xMax - xMin) * plotW; }
+
+  // Axis ticks
+  const muted = 'rgba(160,160,160,0.25)';
+  const mutedTxt = 'rgba(160,160,160,0.7)';
+  ctx2.font = '11px Inter, system-ui, sans-serif';
+  ctx2.fillStyle = mutedTxt;
+  ctx2.textAlign = 'center';
+  const step = Math.ceil((xMax - xMin) / 7);
+  for (let v = Math.ceil(xMin); v <= xMax; v += step) {
+    const x = xScale(v);
+    ctx2.beginPath();
+    ctx2.strokeStyle = muted;
+    ctx2.lineWidth = 1;
+    ctx2.moveTo(x, PAD_T);
+    ctx2.lineTo(x, H - PAD_B + 6);
+    ctx2.stroke();
+    ctx2.fillText(v + 'd', x, H - PAD_B + 18);
+  }
+
+  // X axis line
+  ctx2.beginPath();
+  ctx2.strokeStyle = 'rgba(160,160,160,0.4)';
+  ctx2.lineWidth = 1;
+  ctx2.moveTo(PAD_L, H - PAD_B);
+  ctx2.lineTo(W - PAD_R, H - PAD_B);
+  ctx2.stroke();
+
+  // Draw each group
+  groups.forEach((g, gi) => {
+    const s     = g.stats;
+    const color = cssVar(g.color);
+    const cy    = PAD_T + rowH * gi + rowH / 2;
+    const boxH  = Math.min(rowH * 0.45, 22);
+
+    // Jittered dots (all points, small)
+    const seed = gi * 17;
+    s.points.forEach((v, pi) => {
+      const jitter = (((pi * 1664525 + 1013904223 + seed) >>> 0) % 1000) / 1000 - 0.5;
+      const dy = jitter * boxH * 0.8;
+      const x  = xScale(v);
+      const isOut = v < s.w_lo || v > s.w_hi;
+      ctx2.beginPath();
+      ctx2.arc(x, cy + dy, isOut ? 3.5 : 2.2, 0, Math.PI * 2);
+      ctx2.fillStyle = isOut
+        ? color
+        : color.replace(')', ', 0.35)').replace('rgb(', 'rgba(').replace('#', 'rgba(').replace(')', '');
+      // Simpler alpha approach:
+      ctx2.globalAlpha = isOut ? 0.9 : 0.3;
+      ctx2.fill();
+      ctx2.globalAlpha = 1;
+    });
+
+    // Whisker lines
+    ctx2.strokeStyle = color;
+    ctx2.lineWidth   = 1.5;
+    ctx2.setLineDash([3, 3]);
+    ctx2.beginPath();
+    ctx2.moveTo(xScale(s.w_lo), cy);
+    ctx2.lineTo(xScale(s.q1), cy);
+    ctx2.stroke();
+    ctx2.beginPath();
+    ctx2.moveTo(xScale(s.q3), cy);
+    ctx2.lineTo(xScale(s.w_hi), cy);
+    ctx2.stroke();
+    ctx2.setLineDash([]);
+
+    // Whisker end caps
+    [s.w_lo, s.w_hi].forEach(v => {
+      ctx2.beginPath();
+      ctx2.moveTo(xScale(v), cy - boxH * 0.35);
+      ctx2.lineTo(xScale(v), cy + boxH * 0.35);
+      ctx2.stroke();
+    });
+
+    // IQR box (filled)
+    const bx = xScale(s.q1);
+    const bw = xScale(s.q3) - bx;
+    ctx2.globalAlpha = 0.15;
+    ctx2.fillStyle   = color;
+    ctx2.fillRect(bx, cy - boxH / 2, bw, boxH);
+    ctx2.globalAlpha = 1;
+
+    // IQR box border
+    ctx2.strokeStyle = color;
+    ctx2.lineWidth   = 2;
+    ctx2.strokeRect(bx, cy - boxH / 2, bw, boxH);
+
+    // Median line
+    const mx = xScale(s.median);
+    ctx2.strokeStyle = color;
+    ctx2.lineWidth   = 3;
+    ctx2.beginPath();
+    ctx2.moveTo(mx, cy - boxH / 2);
+    ctx2.lineTo(mx, cy + boxH / 2);
+    ctx2.stroke();
+
+    // Mean dot
+    ctx2.beginPath();
+    ctx2.arc(xScale(s.mean), cy, 3.5, 0, Math.PI * 2);
+    ctx2.fillStyle = color;
+    ctx2.globalAlpha = 0.7;
+    ctx2.fill();
+    ctx2.globalAlpha = 1;
+
+    // Label (left)
+    ctx2.fillStyle   = color;
+    ctx2.font        = '11px "SF Mono", "Fira Code", monospace';
+    ctx2.textAlign   = 'right';
+    ctx2.fillText(g.short, PAD_L - 8, cy + 4);
+
+    // Stats annotation (right of w_hi)
+    const annX = xScale(s.w_hi) + 8;
+    if (annX < W - 2) {
+      ctx2.fillStyle = mutedTxt;
+      ctx2.font      = '10px Inter, system-ui, sans-serif';
+      ctx2.textAlign = 'left';
+      ctx2.fillText(`med ${s.median}d  n=${s.n}`, annX, cy + 4);
+    }
+  });
+})();
+
+async function triggerScrape() {
+    const btn = document.getElementById('scrape-btn');
+    const st  = document.getElementById('scrape-status');
+    btn.disabled = true; btn.textContent = '⏳ Scraping...'; st.textContent = '';
+    try {
+      const r = await fetch('/api/scrape', { method: 'POST' });
+      const d = await r.json();
+      if (d.ok) {
+        st.textContent = `✓ ${d.sample_count} muestras`;
+        setTimeout(() => location.reload(), 700);
+      } else {
+        st.textContent = `✗ ${d.error}`;
+        btn.disabled = false; btn.textContent = '▶ Scrape ahora';
+      }
+    } catch(e) {
+      st.textContent = `✗ ${e.message}`;
+      btn.disabled = false; btn.textContent = '▶ Scrape ahora';
+    }
+  }
+</script>
+</body>
+</html>
