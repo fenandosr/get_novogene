@@ -63,7 +63,13 @@
     .bk-row.is-top .bk-stat  { color: var(--c-dataqc); }
 
     .dr-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
-    .dr-table th { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--pico-muted-color); padding: 0.3rem 0.5rem; border-bottom: 1px solid var(--pico-muted-border-color); text-align: left; }
+    .dr-table th { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--pico-muted-color); padding: 0.3rem 0.5rem; border-bottom: 1px solid var(--pico-muted-border-color); text-align: left; white-space: nowrap; }
+    .dr-table th[data-sort] { cursor: pointer; user-select: none; }
+    .dr-table th[data-sort]:hover { color: var(--pico-primary); }
+    .dr-table th .sort-icon { margin-left: 3px; opacity: 0.35; font-size: 0.6rem; }
+    .dr-table th.sort-asc .sort-icon::after  { content: '▲'; opacity: 1; }
+    .dr-table th.sort-desc .sort-icon::after { content: '▼'; opacity: 1; }
+    .dr-table th:not(.sort-asc):not(.sort-desc) .sort-icon::after { content: '⇅'; }
     .dr-table td { padding: 0.35rem 0.5rem; border-bottom: 1px solid color-mix(in srgb, var(--pico-muted-border-color) 40%, transparent); vertical-align: middle; }
     .dr-table tr:last-child td { border-bottom: none; }
     .dw-late { color: #ef4444; font-weight: 700; }
@@ -115,6 +121,16 @@
 
     #scrape-btn { font-size: 0.78rem; padding: 0.35rem 0.8rem; margin: 0; }
     #scrape-status { font-size: 0.78rem; color: var(--pico-muted-color); }
+
+    .sample-table:not(.show-all) tr[data-fr] { display: none; }
+    .sample-table:not(.show-all) tr[data-fr] + tr { display: none; }
+    .toggle-btn {
+      font-size: 0.7rem; padding: 0.15rem 0.5rem; margin: 0 0 0 0.6rem;
+      border: 1px solid var(--pico-muted-border-color); border-radius: 2rem;
+      background: transparent; color: var(--pico-muted-color); cursor: pointer;
+      vertical-align: middle; white-space: nowrap;
+    }
+    .toggle-btn:hover { border-color: var(--pico-primary); color: var(--pico-primary); }
   </style>
 </head>
 <body>
@@ -179,6 +195,14 @@
   % end
 </div>
 
+<!-- BOXPLOT TAT -->
+% if ctx.get('boxplot'):
+<div class="panel" style="margin-bottom:1.5rem;">
+  <h3>Distribución TAT — registro → data release (días)</h3>
+  <canvas id="bpCanvas" style="width:100%;height:160px;display:block;"></canvas>
+</div>
+% end
+
 <!-- BOTTLENECK + PENDING DATA RELEASE -->
 <div class="panel-row">
 
@@ -199,31 +223,40 @@
   </div>
 
   <div class="panel">
-    <h3>Sin Data Release — requieren seguimiento ({{ctx['need_dr']}})</h3>
+    <h3>Sin reporte — requieren seguimiento ({{len(ctx['pending_dr'])}})</h3>
     % if not ctx['pending_dr']:
     <p class="meta" style="margin:0;">✓ Todas las muestras han alcanzado Data Release</p>
     % else:
     <div style="overflow-x:auto;">
-    <table class="dr-table">
+    <table class="dr-table" id="dr-table">
       <thead><tr>
-        <th>Muestra</th><th>Proyecto</th><th>Estado</th><th>Recibida</th><th>Días</th>
+        <th data-sort="str">Muestra<span class="sort-icon"></span></th>
+        <th data-sort="str">Proyecto<span class="sort-icon"></span></th>
+        <th data-sort="str">Estado<span class="sort-icon"></span></th>
+        <th data-sort="date">Registro<span class="sort-icon"></span></th>
+        <th data-sort="date">Recibida<span class="sort-icon"></span></th>
+        <th data-sort="num" class="sort-asc">Días<span class="sort-icon"></span></th>
       </tr></thead>
       <tbody>
         % for s in ctx['pending_dr']:
+        % pending_arrival = (s['timeline'].get('PENDING_ARRIVAL') or '')[:10]
+        % received        = (s['timeline'].get('RECEIVED') or s.get('qc_arrived_date',''))[:10]
+        % days_val        = s['days_waiting'] if s['days_waiting'] is not None else -1
         <tr>
-          <td><strong>{{s['sample_name']}}</strong></td>
-          <td>
+          <td data-val="{{s['sample_name']}}"><strong>{{s['sample_name']}}</strong></td>
+          <td data-val="{{s['proj_alias']}}">
             <span class="proj-tag" style="color:{{s['proj_color']}};border:1px solid {{s['proj_color']}};">
               {{s['proj_alias']}}
             </span>
           </td>
-          <td>
+          <td data-val="{{s['current_status_meaning']}}">
             <span class="badge" style="background:color-mix(in srgb,{{s['badge_color']}} 18%,transparent);color:{{s['badge_color']}};border:1px solid color-mix(in srgb,{{s['badge_color']}} 35%,transparent);">
               {{s['current_status_meaning']}}
             </span>
           </td>
-          <td class="meta">{{(s['timeline'].get('RECEIVED') or s.get('qc_arrived_date',''))[:10] or '—'}}</td>
-          <td>
+          <td data-val="{{pending_arrival}}" class="meta">{{pending_arrival or '—'}}</td>
+          <td data-val="{{received}}" class="meta">{{received or '—'}}</td>
+          <td data-val="{{days_val}}">
             % if s['days_waiting'] is not None:
             <span class="{{s['days_waiting_cls']}}">{{s['days_waiting']}}d</span>
             % else:
@@ -238,12 +271,6 @@
     % end
   </div>
 
-</div>
-
-<!-- BOXPLOT TAT -->
-<div class="panel" style="margin-bottom:1.5rem;">
-  <h3>Distribución TAT — recibido → data release (días)</h3>
-  <canvas id="bpCanvas" style="width:100%;height:160px;display:block;"></canvas>
 </div>
 
 <!-- PIPELINE LEGEND -->
@@ -269,20 +296,22 @@
     {{project['alias']}}
   </span>
   <h2 class="project-name">{{project['sub_project_no']}}</h2>
+  % tbl_id = 'tbl-' + project['sub_project_no'].replace('-', '_')
   <span class="meta" style="margin-left:auto;">
     {{project['complete_count']}} / {{project['sample_count']}} completadas
+    <button class="toggle-btn" onclick="toggleProject(this,'{{tbl_id}}')">mostrar todas</button>
   </span>
 </div>
 
 <div style="overflow-x:auto;margin-bottom:1.5rem;">
-<table class="sample-table">
+<table class="sample-table" id="{{tbl_id}}">
   <thead><tr>
     <th>Muestra</th><th>Novo ID</th><th>Progreso</th>
     <th>Estado actual</th><th>Recibida</th><th>Reporte</th><th>TAT</th>
   </tr></thead>
   <tbody>
     % for s in project['sorted_samples']:
-    <tr class="{{s['row_class']}}">
+    <tr class="{{s['row_class']}}" {{'data-fr=""' if s['has_final_report'] else ''}}>
       <td><strong>{{s['sample_name']}}</strong></td>
       <td class="meta">{{s['novo_id']}}</td>
       <td>
@@ -499,6 +528,47 @@ const BP_GROUPS = {{!__import__('json').dumps(ctx.get('boxplot', []))}};
       ctx2.textAlign = 'left';
       ctx2.fillText(`med ${s.median}d  n=${s.n}`, annX, cy + 4);
     }
+  });
+})();
+
+// ── Per-project table toggle ───────────────────────────────────────
+function toggleProject(btn, tblId) {
+  const tbl = document.getElementById(tblId);
+  const showingAll = tbl.classList.toggle('show-all');
+  btn.textContent = showingAll ? 'solo en proceso' : 'mostrar todas';
+}
+
+// ── Sortable dr-table ──────────────────────────────────────────────
+(function initDrTableSort() {
+  const table = document.getElementById('dr-table');
+  if (!table) return;
+  const tbody = table.tBodies[0];
+  const headers = [...table.tHead.rows[0].cells];
+
+  headers.forEach((th, colIdx) => {
+    if (!th.dataset.sort) return;
+    th.addEventListener('click', () => {
+      const asc = !th.classList.contains('sort-asc');
+      headers.forEach(h => h.classList.remove('sort-asc', 'sort-desc'));
+      th.classList.add(asc ? 'sort-asc' : 'sort-desc');
+
+      const type = th.dataset.sort;
+      const rows = [...tbody.rows];
+      rows.sort((a, b) => {
+        const av = a.cells[colIdx].dataset.val ?? '';
+        const bv = b.cells[colIdx].dataset.val ?? '';
+        let cmp;
+        if (type === 'num') {
+          cmp = (parseFloat(av) || -Infinity) - (parseFloat(bv) || -Infinity);
+        } else if (type === 'date') {
+          cmp = (av || '0') < (bv || '0') ? -1 : (av || '0') > (bv || '0') ? 1 : 0;
+        } else {
+          cmp = av.localeCompare(bv, 'es', { sensitivity: 'base' });
+        }
+        return asc ? cmp : -cmp;
+      });
+      rows.forEach(r => tbody.appendChild(r));
+    });
   });
 })();
 

@@ -8,6 +8,9 @@ Data: REST endpoint /service/v1/0/nsrv-sample-infos/selectSampleInfoBySubjectCod
 import os
 import re
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
+
+CDMX = ZoneInfo("America/Mexico_City")
 
 import requests
 from dotenv import load_dotenv
@@ -251,10 +254,10 @@ def run_scrape() -> dict:
         projects.append(project)
         print(f"    {project['sample_count']} samples")
 
-    ts = datetime.now(timezone.utc)
+    ts = datetime.now(CDMX)
     return {
         "timestamp": ts.isoformat(),
-        "timestamp_display": ts.strftime("%Y-%m-%d %H:%M UTC"),
+        "timestamp_display": ts.strftime("%Y-%m-%d %H:%M CDMX"),
         "project_count": len(projects),
         "projects": projects,
     }

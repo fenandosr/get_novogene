@@ -86,6 +86,7 @@ def _prepare_ctx(run_data):
 
     from collections import defaultdict
     from datetime import datetime
+    from zoneinfo import ZoneInfo
 
     aliases = _load_aliases()
 
@@ -115,9 +116,10 @@ def _prepare_ctx(run_data):
         b["pct"] = round(b["avg"] / max_avg * 100)
         b["is_top"] = b["key"] == top_key
 
-    # Pending data release
-    pending_dr = [s for s in all_samples if s.get("needs_data_release")]
-    now = datetime.now()
+    # Pending data release — exclude samples that already have a Final Report
+    pending_dr = [s for s in all_samples
+                  if s.get("needs_data_release") and not s["timeline"].get("FINAL_REPORT")]
+    now = datetime.now(ZoneInfo("America/Mexico_City")).replace(tzinfo=None)
     expected_tat = int(os.getenv("NOVOGENE_EXPECTED_TAT_DAYS", "30"))
     for s in pending_dr:
         received = s["timeline"].get("RECEIVED") or s.get("qc_arrived_date", "")
@@ -145,6 +147,7 @@ def _prepare_ctx(run_data):
     for p in run_data["projects"]:
         for s in p["samples"]:
             st = s["current_status"]
+            s["has_final_report"] = bool(s["timeline"].get("FINAL_REPORT"))
             s["badge_color"] = color_map.get(st, "var(--pico-muted-color)")
             s["proj_color"]  = proj_color.get(s["sub_project_no"], "var(--pico-muted-color)")
             s["proj_alias"]  = proj_alias.get(s["sub_project_no"], s["sub_project_no"])
