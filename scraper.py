@@ -197,8 +197,8 @@ def fetch_project(sub_project_no: str, token: str) -> dict:
         is_complete = data_release is not None
         is_delayed = (
             not is_complete
-            and received is not None
-            and _tat_days(received, datetime.now()) > expected_tat
+            and pending is not None
+            and _tat_days(pending, datetime.now()) > expected_tat
         )
 
         current_status = s.get("sampleStatus", "")
@@ -220,6 +220,7 @@ def fetch_project(sub_project_no: str, token: str) -> dict:
             "stage_durations": _stage_durations(timeline),
             "tat_received_to_release": tat_received,
             "tat_pending_to_release": tat_pending,
+            "tat": tat_pending,
             "is_complete": is_complete,
             "is_delayed": is_delayed,
             "needs_data_release": not has_data_release,

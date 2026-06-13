@@ -90,7 +90,7 @@ def _prepare_ctx(run_data):
     aliases = _load_aliases()
 
     all_samples = [s for p in run_data["projects"] for s in p["samples"]]
-    tats = [s["tat_received_to_release"] for s in all_samples if s["tat_received_to_release"] is not None]
+    tats = [s["tat"] for s in all_samples if s["tat"] is not None]
 
     # Bottleneck analysis
     dur_buckets = defaultdict(list)
@@ -148,7 +148,7 @@ def _prepare_ctx(run_data):
             s["badge_color"] = color_map.get(st, "var(--pico-muted-color)")
             s["proj_color"]  = proj_color.get(s["sub_project_no"], "var(--pico-muted-color)")
             s["proj_alias"]  = proj_alias.get(s["sub_project_no"], s["sub_project_no"])
-            tat = s["tat_received_to_release"]
+            tat = s["tat"]
             if tat is None:
                 s["tat_cls"], s["tat_lbl"] = "pend", "en curso"
             elif tat <= expected_tat:
@@ -218,9 +218,9 @@ def _prepare_ctx(run_data):
                 "short": aliases.get(p["sub_project_no"], p["sub_project_no"]),
                 "color": proj_color.get(p["sub_project_no"], "var(--c-received)"),
                 "stats": _boxplot_stats([
-                    s["tat_received_to_release"]
+                    s["tat"]
                     for s in p["samples"]
-                    if s.get("tat_received_to_release") is not None
+                    if s.get("tat") is not None
                 ]),
             }
             for p in run_data["projects"]
