@@ -201,7 +201,7 @@ def fetch_project(sub_project_no: str, token: str) -> dict:
         is_delayed = (
             not is_complete
             and pending is not None
-            and _tat_days(pending, datetime.now()) > expected_tat
+            and (_tat_days(pending, datetime.now()) or 0) > expected_tat
         )
 
         current_status = s.get("sampleStatus", "")
