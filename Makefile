@@ -1,4 +1,4 @@
-.PHONY: check run serve
+.PHONY: check run serve fix
 
 UV = uv run python
 
@@ -12,3 +12,6 @@ run:
 
 serve:
 	$(UV) main.py serve
+
+fix:
+	$(UV) fix.py $(ARGS)
