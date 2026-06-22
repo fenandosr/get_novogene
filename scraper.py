@@ -1,7 +1,7 @@
 """
 Novogene CSS America scraper.
 
-Auth: SSO via portal-global.novogene.com → OAuth2 token from ocssamerica.
+Auth: Direct login via ocss.novogeneusa.com → OAuth2 token (client_id=localhost).
 Data: REST endpoint /service/v1/0/nsrv-sample-infos/selectSampleInfoBySubjectCode
 """
 
@@ -17,8 +17,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-API_BASE = "https://ocssamerica.novogene.com"
-PORTAL_BASE = "https://portal-global.novogene.com"
+API_BASE = "https://ocss.novogeneusa.com"
+CSS_BASE = "https://css.novogeneusa.com"
 _UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:151.0) Gecko/20100101 Firefox/151.0"
 STAGE_ORDER = [
     "PENDING_ARRIVAL",
@@ -40,49 +40,35 @@ STAGE_LABELS = {
 }
 
 
-def _get_token_via_portal(username: str, password: str) -> str:
-    """Login via portal-global SSO and return bearer token for ocssamerica.
+def _get_token_via_css(username: str, password: str) -> str:
+    """Login directly via ocss.novogeneusa.com and return bearer token.
 
     Flow:
-    1. POST portal/login → session + HSKP_TOKEN
-    2. GET portal/oauth2/authorize → redirect with auth code
-    3. Follow: ocssamerica/oauth/sso/paas → ocssamerica/oauth/oauth/authorize
-    4. Extract access_token from final redirect fragment
+    1. POST ocss/oauth/login → SESSION cookie
+    2. GET ocss/oauth/oauth/authorize → redirect to css.novogeneusa.com/pub/home#access_token=...
+    3. Extract access_token from fragment
     """
     session = requests.Session()
     session.headers.update({"User-Agent": _UA})
 
-    # Step 1: portal login (plain password; portal does NOT use RSA here)
-    session.get(f"{PORTAL_BASE}/login", headers={"Accept": "text/html,*/*"})
+    # Step 1: GET login page to obtain initial cookies
+    session.get(f"{API_BASE}/oauth/login", headers={"Accept": "text/html,*/*"})
+
+    # Step 2: POST credentials (plain password accepted by this endpoint)
     r = session.post(
-        f"{PORTAL_BASE}/login",
-        data={"username": f"GLOBAL_{username}", "password": password},
+        f"{API_BASE}/oauth/login",
+        data={"username": username, "password": password},
         headers={
             "Content-Type": "application/x-www-form-urlencoded",
-            "Origin": PORTAL_BASE,
-            "Referer": f"{PORTAL_BASE}/login",
+            "Origin": CSS_BASE,
+            "Referer": f"{CSS_BASE}/",
         },
-        allow_redirects=True,
-    )
-    r.raise_for_status()
-
-    # Step 2: get authorization code from portal (authenticated session auto-approves)
-    r = session.get(
-        f"{PORTAL_BASE}/oauth2/authorize",
-        params={
-            "response_type": "code",
-            "client_id": "Qba3WPly",
-            "redirect_uri": f"{API_BASE}/oauth/sso/paas",
-            "scope": "openid",
-            "state": "https://cssamerica.novogene.com",
-        },
-        headers={"Accept": "text/html,*/*"},
         allow_redirects=False,
     )
     if r.status_code != 302:
-        raise RuntimeError(f"Portal oauth2/authorize failed: {r.status_code} {r.text[:200]}")
+        raise RuntimeError(f"CSS login failed: {r.status_code} {r.text[:200]}")
 
-    # Steps 3-4: follow redirect chain until access_token appears in URL fragment
+    # Step 3: follow redirect chain until access_token appears in URL fragment
     url = r.headers["Location"]
     for _ in range(6):
         resp = session.get(url, headers={"Accept": "text/html,*/*"}, allow_redirects=False)
@@ -90,7 +76,7 @@ def _get_token_via_portal(username: str, password: str) -> str:
         m = re.search(r"access_token=([^&#\s]+)", url + loc)
         if m:
             return m.group(1)
-        if resp.status_code != 302 or not loc:
+        if resp.status_code not in (301, 302) or not loc:
             raise RuntimeError(
                 f"Token not found in redirect chain. Last URL: {url} | "
                 f"Status: {resp.status_code} | Body: {resp.text[:200]}"
@@ -109,7 +95,7 @@ def get_token() -> str:
     if username and password:
         print(f"  Logging in as {username}...")
         try:
-            return _get_token_via_portal(username, password)
+            return _get_token_via_css(username, password)
         except Exception as e:
             if static_token:
                 print(f"  Login failed ({e}), using NOVOGENE_TOKEN as fallback.")
@@ -174,8 +160,8 @@ def fetch_project(sub_project_no: str, token: str) -> dict:
             "Accept": "application/json",
             "authorization": f"bearer {token}",
             "h-menu-id": "-1",
-            "Origin": "https://cssamerica.novogene.com",
-            "Referer": "https://cssamerica.novogene.com/",
+            "Origin": CSS_BASE,
+            "Referer": f"{CSS_BASE}/",
         },
     )
     r.raise_for_status()
