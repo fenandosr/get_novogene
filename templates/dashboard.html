@@ -311,7 +311,7 @@
   </tr></thead>
   <tbody>
     % for s in project['sorted_samples']:
-    <tr class="{{s['row_class']}}" {{'data-fr=""' if s['has_final_report'] else ''}}>
+    <tr class="{{s['row_class']}}" {{'data-fr=""' if not s['in_process_view'] else ''}}>
       <td><strong>{{s['sample_name']}}</strong></td>
       <td class="meta">{{s['novo_id']}}</td>
       <td>

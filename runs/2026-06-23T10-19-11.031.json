@@ -1,6 +1,6 @@
 {
-  "timestamp": "2026-06-22T12:07:16.416403-06:00",
-  "timestamp_display": "2026-06-22 12:07 CDMX",
+  "timestamp": "2026-06-23T10:19:11.031725-06:00",
+  "timestamp_display": "2026-06-23 10:19 CDMX",
   "project_count": 2,
   "projects": [
     {
@@ -2396,9 +2396,9 @@
           "sample_name": "HG26EX0004",
           "novo_id": "CKDN260010890-1A",
           "product_name": "Human Whole Exome Sequencing (WOBI)",
-          "current_status": "LIB_PREP_OR_SEQUENCING",
-          "current_status_meaning": "Library Prep/Sequencing",
-          "stage_index": 3,
+          "current_status": "FINAL_REPORT",
+          "current_status_meaning": "Final Report",
+          "stage_index": 5,
           "qc_arrived_date": "2026-06-07 04:59:05",
           "timeline": {
             "PENDING_ARRIVAL": "2026-05-29 07:07:37",
@@ -2406,7 +2406,7 @@
             "SAMPLE_QC": "2026-06-06 21:49:18",
             "LIB_PREP_OR_SEQUENCING": "2026-06-14 08:48:32",
             "DATA_QC": null,
-            "FINAL_REPORT": null,
+            "FINAL_REPORT": "2026-06-23 07:41:04",
             "DATA_RELEASE": null
           },
           "stage_durations": {

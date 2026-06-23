@@ -116,9 +116,15 @@ def _prepare_ctx(run_data):
         b["pct"] = round(b["avg"] / max_avg * 100)
         b["is_top"] = b["key"] == top_key
 
-    # Pending data release — exclude samples that already have a Final Report
-    pending_dr = [s for s in all_samples
-                  if s.get("needs_data_release") and not s["timeline"].get("FINAL_REPORT")]
+    def _in_process_view(s):
+        return (
+            s.get("needs_data_release")
+            and s.get("current_status") != "DESTROYED"
+            and not (s.get("current_status") != "FINAL_REPORT" and s["timeline"].get("FINAL_REPORT"))
+        )
+
+    # Pending data release — exclude DESTROYED (Sample Disposed) and those with Final Report
+    pending_dr = [s for s in all_samples if _in_process_view(s)]
     now = datetime.now(ZoneInfo("America/Mexico_City")).replace(tzinfo=None)
     expected_tat = int(os.getenv("NOVOGENE_EXPECTED_TAT_DAYS", "30"))
     for s in pending_dr:
@@ -148,6 +154,7 @@ def _prepare_ctx(run_data):
         for s in p["samples"]:
             st = s["current_status"]
             s["has_final_report"] = bool(s["timeline"].get("FINAL_REPORT"))
+            s["in_process_view"] = _in_process_view(s)
             s["badge_color"] = color_map.get(st, "var(--pico-muted-color)")
             s["proj_color"]  = proj_color.get(s["sub_project_no"], "var(--pico-muted-color)")
             s["proj_alias"]  = proj_alias.get(s["sub_project_no"], s["sub_project_no"])
